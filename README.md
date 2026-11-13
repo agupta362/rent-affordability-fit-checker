@@ -17,22 +17,23 @@
 **Project Option:** Predictive ML Application (Option 1 – Predictive Web Application)
 
 ### Problem Statement
-Students and early-career renters often struggle to judge whether an apartment truly fits their monthly budget. Listing sites show rent, but they rarely translate income, rent, and utilities into a clear affordability signal. This application predicts a rent-fit label—**Comfortable**, **Stretch**, or **Too High**—and estimates leftover money after housing costs. It helps users compare listings quickly before they overcommit. Results are planning guidance only, not financial advice.
+Students and early-career renters often struggle to judge whether an apartment truly fits their life—not just the rent number. Listing sites show rent and maybe utilities, but they ignore whether someone eats out often, how expensive food is in that neighborhood, lifestyle extras, and whether the area/unit condition is worth the cost. This application predicts a rent-fit label—**Comfortable**, **Stretch**, or **Too High**—using money basics plus lifestyle and neighborhood context, and estimates leftover cash after those costs. Results are planning guidance only, not financial advice.
 
 ### Intended Users
-Students, interns, and early-career renters who are comparing apartments. They will enter a few budget numbers, see a fit label and leftover estimate, and (in the final version) compare listings and review saved checks.
+Students, interns, and early-career renters comparing apartments. They enter budget and lifestyle details, see a fit label and leftover estimate, and (in the final version) compare listings and review saved checks.
 
 ### Unique Features
-Unlike classroom ML notebooks, this is a form-based Streamlit app focused on a personal decision. Unlike a simple rent calculator, it uses a trained classification model, supports scenario comparison, and stores prediction history in SQLite. The interface stays small: only three required inputs.
+Unlike classroom ML notebooks or a plain rent calculator, this Streamlit app combines housing costs with personal lifestyle flags (eat-out habits, neighborhood food prices, accessories/extras) and place quality (neighborhood rating, unit condition). A trained classifier turns that into a clear fit decision with history/compare features planned for the final app.
 
 ## 2. Application Features
 
-- **Feature 1:** Enter monthly income, rent, and utilities; get a fit label (Comfortable / Stretch / Too High).
-- **Feature 2:** Show estimated leftover cash and housing share of income.
-- **Feature 3:** Input validation and clear messages for invalid or missing values.
-- **Feature 4 (final):** Compare two listings side by side and save prediction history in SQLite.
+- **Feature 1:** Money inputs — monthly income, rent, utilities.
+- **Feature 2:** Lifestyle inputs — eat-out level, neighborhood food cost, monthly extras/accessories; app estimates food spend for that area.
+- **Feature 3:** Place inputs — neighborhood quality and apartment/rent condition; these affect the affordability/value judgment.
+- **Feature 4:** Output — Comfortable / Stretch / Too High, leftover $, housing share, total burden share, and a short value note.
+- **Feature 5 (final):** Compare two listings and save prediction history in SQLite.
 
-Users interact through a short Streamlit form, click **Check rent fit**, and receive a label plus leftover estimate. In the final app they can compare another listing and view past checks.
+Users fill a short grouped form, click **Check rent fit**, and receive a label plus cost breakdown. Final version adds compare + history.
 
 ## 3. Technologies Used
 
@@ -52,11 +53,11 @@ Users interact through a short Streamlit form, click **Check rent fit**, and rec
 
 ### How the Application Works
 
-1. The user enters monthly income, rent, and utilities.
+1. The user enters money basics, lifestyle/food choices, and neighborhood/unit ratings.
 2. The Streamlit interface (`app.py`) passes the values to Python.
-3. The `RentFitPredictor` class validates inputs and builds features (including rent-to-income ratio).
+3. The `RentFitPredictor` class validates inputs and builds features (housing cost, estimated food spend, extras, burden-to-income, quality scores).
 4. The application loads `models/rent_fit_model.joblib` and runs classification inference.
-5. The fit label, leftover amount, and housing share are displayed to the user.
+5. The fit label, leftover amount, burden shares, and value note are displayed.
 6. In the final version, the result can be saved to SQLite through `database.py`.
 
 Training happens offline in `notebooks/` and exports the joblib file. The web app does not retrain on each prediction.
@@ -84,7 +85,7 @@ rent-affordability-fit-checker/
 ```
 
 **Important files**
-- `app.py` — Streamlit UI
+- `app.py` — Streamlit UI (grouped money / lifestyle / place inputs)
 - `rent_predictor.py` — `RentFitPredictor` class (validate, features, predict)
 - `database.py` — SQLite helpers for history (final)
 - `notebooks/train_model_starter.py` — training starter that exports the joblib model
@@ -131,40 +132,41 @@ streamlit run app.py
 
 | Test | Expected Result | Actual Result |
 |---|---|---|
-| Normal user input (e.g., income 4500, rent 1800, utilities 150) | Fit label + leftover shown | Pending — Deliverable 2 |
+| Normal inputs (income/rent/utilities + lifestyle defaults) | Fit label + leftover + food estimate | Pending — Deliverable 2 |
 | Invalid or missing input (blank / negative values) | Helpful error message | Pending — Deliverable 2 |
+| High eat-out + expensive neighborhood food | Higher burden; may move Comfortable → Stretch/Too High | Pending — Deliverable 2 |
 | Model interaction after training | Label from saved joblib model | Pending — Deliverable 2 |
 | History / compare feature | Saved or compared results display | Pending — final |
 
-**Known limitations (Deliverable 1):** Labels are based on documented rent-to-income style rules using synthetic training examples. This is educational guidance, not professional financial advice. Full model-backed inference and formal test evidence come in later deliverables.
+**Known limitations (Deliverable 1):** Food spend is estimated from eat-out × neighborhood food-cost bands. Labels use documented synthetic rules. Educational guidance only—not professional financial advice.
 
 ## 8. AI-Assisted Development Disclosure
 
 **AI Tools Used:** ChatGPT, Cursor, GitHub Copilot (planned / in use for scaffolding)
 
 ### How AI Was Used
-AI assistance is planned for class structure, Streamlit form wiring, SQLite helpers, debugging, and README/documentation wording. For Deliverable 1, AI helped draft the proposal structure, repository scaffold, and architecture wording.
+AI assistance is planned for class structure, Streamlit form wiring, SQLite helpers, debugging, and README/documentation wording. For Deliverable 1, AI helped draft the proposal structure, repository scaffold, lifestyle-feature design, and architecture wording.
 
 ### Student Contributions
-I defined the problem (rent fit for students/early-career renters), chose Option 1, selected the three-input design, planned the architecture (`app.py` → `RentFitPredictor` → joblib → SQLite), and will own labeling rules, integration, testing, and explanation of the final code.
+I defined the personal rent-fit problem, chose Option 1, expanded inputs to include lifestyle and neighborhood context, planned the architecture (`app.py` → `RentFitPredictor` → joblib → SQLite), and will own labeling rules, integration, testing, and explanation of the final code.
 
 **Student statement:** I reviewed, tested, and can explain the code and technologies used in my application, including code developed with AI assistance.
 
 ## 9. Challenges and Lessons Learned
 
-**Challenge 1:** Keeping the UI simple while still meeting Option 1 ML requirements.  
-**Solution (planned):** Only three user inputs; richer features (like rent-to-income) are computed inside the predictor class.
+**Challenge 1:** Rent alone is not enough for a personal “can I afford this?” decision.  
+**Solution (planned):** Include eat-out habits, neighborhood food cost, extras, neighborhood quality, and unit condition in the feature set and burden calculation.
 
-**Challenge 2:** Making Comfortable / Stretch / Too High explainable.  
-**Solution (planned):** Document labeling rules in the training notebook and show housing share with every prediction.
+**Challenge 2:** Keeping the form usable while adding lifestyle context.  
+**Solution (planned):** Group inputs into Money / Lifestyle & food / Neighborhood & unit sections with dropdowns for categorical choices.
 
-New skills to develop: packaging a trained model with Streamlit, class-based prediction design, and SQLite history for a small decision app.
+New skills to develop: packaging a trained model with Streamlit, class-based feature engineering for lifestyle variables, and SQLite history for a small decision app.
 
 ## 10. Application Screenshots
 
 Screenshots will be added for Deliverable 2 / final:
 
-1. Main application interface
+1. Main application interface (grouped inputs)
 2. Application showing a working prediction result
 
 ```markdown
@@ -182,7 +184,7 @@ Screenshots will be added for Deliverable 2 / final:
 
 1. Wire the Streamlit app fully to the trained joblib model (replace preview rules).
 2. Add listing compare + SQLite history chart for the final submission.
-3. Optional city cost band input if it improves model usefulness.
+3. Optional presets (e.g., “student who eats out often”) to speed data entry.
 
 ---
 
