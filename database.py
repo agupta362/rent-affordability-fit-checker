@@ -1,4 +1,4 @@
-"""SQLite helpers for prediction history (final app target)."""
+"""SQLite helpers for decision journal / prediction history (final app target)."""
 
 from __future__ import annotations
 
@@ -26,6 +26,7 @@ def init_db(db_path: Path | str = DB_PATH) -> None:
                 income REAL NOT NULL,
                 rent REAL NOT NULL,
                 utilities REAL NOT NULL,
+                roommates INTEGER NOT NULL,
                 eat_out TEXT NOT NULL,
                 neighborhood_food_cost TEXT NOT NULL,
                 lifestyle_extras REAL NOT NULL,
@@ -33,9 +34,11 @@ def init_db(db_path: Path | str = DB_PATH) -> None:
                 unit_condition TEXT NOT NULL,
                 food_spend REAL NOT NULL,
                 fit_label TEXT NOT NULL,
+                place_worth_score INTEGER NOT NULL,
                 leftover REAL NOT NULL,
                 housing_share REAL NOT NULL,
                 burden_share REAL NOT NULL,
+                decision_note TEXT,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
             """
@@ -49,15 +52,17 @@ def save_prediction(payload: dict[str, Any], db_path: Path | str = DB_PATH) -> N
         conn.execute(
             """
             INSERT INTO prediction_history (
-                income, rent, utilities, eat_out, neighborhood_food_cost,
+                income, rent, utilities, roommates, eat_out, neighborhood_food_cost,
                 lifestyle_extras, neighborhood_quality, unit_condition, food_spend,
-                fit_label, leftover, housing_share, burden_share
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                fit_label, place_worth_score, leftover, housing_share, burden_share,
+                decision_note
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 payload["income"],
                 payload["rent"],
                 payload["utilities"],
+                payload["roommates"],
                 payload["eat_out"],
                 payload["neighborhood_food_cost"],
                 payload["lifestyle_extras"],
@@ -65,9 +70,11 @@ def save_prediction(payload: dict[str, Any], db_path: Path | str = DB_PATH) -> N
                 payload["unit_condition"],
                 payload["food_spend"],
                 payload["fit_label"],
+                payload["place_worth_score"],
                 payload["leftover"],
                 payload["housing_share"],
                 payload["burden_share"],
+                payload.get("decision_note"),
             ),
         )
         conn.commit()

@@ -17,23 +17,32 @@
 **Project Option:** Predictive ML Application (Option 1 – Predictive Web Application)
 
 ### Problem Statement
-Students and early-career renters often struggle to judge whether an apartment truly fits their life—not just the rent number. Listing sites show rent and maybe utilities, but they ignore whether someone eats out often, how expensive food is in that neighborhood, lifestyle extras, and whether the area/unit condition is worth the cost. This application predicts a rent-fit label—**Comfortable**, **Stretch**, or **Too High**—using money basics plus lifestyle and neighborhood context, and estimates leftover cash after those costs. Results are planning guidance only, not financial advice.
+Students and early-career renters often struggle to judge whether an apartment truly fits their life—not just the rent number. Typical websites apply a blunt 30% rent rule and ignore eat-out habits, neighborhood food prices, extras, roommates, and whether the area/unit is worth paying for. This application predicts a rent-fit label—**Comfortable**, **Stretch**, or **Too High**—using money basics plus lifestyle and place context, then adds decision tools most calculators lack (dual scores, reverse advice, stress tests). Results are planning guidance only, not financial advice.
 
 ### Intended Users
-Students, interns, and early-career renters comparing apartments. They enter budget and lifestyle details, see a fit label and leftover estimate, and (in the final version) compare listings and review saved checks.
+Students, interns, and early-career renters comparing apartments—especially people with roommates or lifestyle spending that a generic calculator misses. They enter budget and lifestyle details, see Money Fit + Place Worth, get “what to change” advice, and (in the final version) save a decision journal.
 
 ### Unique Features
-Unlike classroom ML notebooks or a plain rent calculator, this Streamlit app combines housing costs with personal lifestyle flags (eat-out habits, neighborhood food prices, accessories/extras) and place quality (neighborhood rating, unit condition). A trained classifier turns that into a clear fit decision with history/compare features planned for the final app.
+This is **not** a classroom penguin/demo notebook and **not** a clone of NerdWallet/Zillow-style rent % calculators. Unique pieces:
+
+1. **Lifestyle-adjusted burden model** — rent + utilities + neighborhood food estimate + extras, not rent-only rules.
+2. **Dual score** — **Money Fit** label and a separate **Place Worth** score (neighborhood + unit condition).
+3. **Gap-to-Comfortable advisor** — reverse guidance (target rent share, cut eat-out/extras) instead of only scoring current inputs.
+4. **Lifestyle stress test** — one-click Rarely vs Sometimes vs Often eat-out comparison for the same listing.
+5. **Roommate share mode** — predicts on *your* portion of listed rent.
+6. **Student safety-buffer warning** — flags leftover below an emergency monthly target.
+7. **Decision journal** (final) — save a personal note with each prediction (why this place matters), beyond anonymous calculator results.
 
 ## 2. Application Features
 
-- **Feature 1:** Money inputs — monthly income, rent, utilities.
-- **Feature 2:** Lifestyle inputs — eat-out level, neighborhood food cost, monthly extras/accessories; app estimates food spend for that area.
-- **Feature 3:** Place inputs — neighborhood quality and apartment/rent condition; these affect the affordability/value judgment.
-- **Feature 4:** Output — Comfortable / Stretch / Too High, leftover $, housing share, total burden share, and a short value note.
-- **Feature 5 (final):** Compare two listings and save prediction history in SQLite.
+- **Feature 1:** Money inputs — income, listed rent, utilities, people splitting rent.
+- **Feature 2:** Lifestyle inputs — eat-out level, neighborhood food cost, extras/accessories; app estimates food spend for that area.
+- **Feature 3:** Place inputs — neighborhood quality and apartment condition → Place Worth score.
+- **Feature 4:** Dual output — Money Fit + Place Worth, leftover, burden share, value note, safety-buffer alert.
+- **Feature 5:** Gap-to-Comfortable advisor and lifestyle stress-test table.
+- **Feature 6 (final):** Listing compare + SQLite decision-journal history.
 
-Users fill a short grouped form, click **Check rent fit**, and receive a label plus cost breakdown. Final version adds compare + history.
+Users fill a grouped form, click **Check rent fit**, and receive dual scores plus advisor/stress-test tools.
 
 ## 3. Technologies Used
 
@@ -53,12 +62,12 @@ Users fill a short grouped form, click **Check rent fit**, and receive a label p
 
 ### How the Application Works
 
-1. The user enters money basics, lifestyle/food choices, and neighborhood/unit ratings.
+1. The user enters money basics (including roommates), lifestyle/food choices, place ratings, and an optional journal note.
 2. The Streamlit interface (`app.py`) passes the values to Python.
-3. The `RentFitPredictor` class validates inputs and builds features (housing cost, estimated food spend, extras, burden-to-income, quality scores).
-4. The application loads `models/rent_fit_model.joblib` and runs classification inference.
-5. The fit label, leftover amount, burden shares, and value note are displayed.
-6. In the final version, the result can be saved to SQLite through `database.py`.
+3. The `RentFitPredictor` class validates inputs and builds lifestyle-adjusted features (rent share, food estimate, extras, burden, place worth).
+4. The application loads `models/rent_fit_model.joblib` and runs classification inference (preview rules until prototype wiring is complete).
+5. Dual scores are shown, then Gap-to-Comfortable tips and an eat-out stress-test table.
+6. In the final version, predictions + journal notes are saved through `database.py`.
 
 Training happens offline in `notebooks/` and exports the joblib file. The web app does not retrain on each prediction.
 
