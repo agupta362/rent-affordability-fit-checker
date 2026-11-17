@@ -66,6 +66,75 @@ This is **not** a classroom demo notebook and **not** a clone of common web rent
 | SQLite | Store prediction history / decision journal (final) |
 | Matplotlib | Optional charts of saved prediction history (final) |
 
+## 3b. Synthetic Data Design (what we create, use, and predict)
+
+Because real personal budget + lifestyle labels are private and hard to collect at class scale, the training set is **synthetic but rule-documented**. The model learns from generated examples that follow clear affordability rules; the app is educational, not a claim of real-world credit/rent underwriting accuracy.
+
+### How the synthetic data is created
+1. Generate about **800–1,000 rows** with a fixed random seed for reproducibility (`notebooks/train_model_starter.py`).
+2. Sample realistic ranges for money variables (income, rent as a share of income, utilities, extras).
+3. Sample lifestyle/place categories as scores (eat-out, neighborhood food cost, neighborhood quality, unit condition).
+4. **Derive** food spend from eat-out × neighborhood food-cost bands (lookup table).
+5. Compute housing cost, total monthly burden, rent-to-income, and burden-to-income.
+6. Assign the target label from burden bands, with a small quality nudge (weak place + Stretch → Too High).
+7. Save to `data/rent_fit_training.csv` and train/export `models/rent_fit_model.joblib`.
+
+### Attributes put into the dataset (inputs / features)
+
+| Attribute | Type | Example / range | Role |
+|---|---|---|---|
+| `income` | numeric | ~$2,200–$12,000 / mo | Ability to pay |
+| `rent` / `rent_share` | numeric | ~15–50% of income (listed rent; share if roommates) | Main housing cost |
+| `utilities` | numeric | ~$50–$350 / mo | Housing add-on |
+| `eat_out_score` | categorical→score | 1 Rarely, 2 Sometimes, 3 Often | Lifestyle food behavior |
+| `food_cost_score` | categorical→score | 1 Low, 2 Medium, 3 High | Neighborhood food prices |
+| `food_spend` | derived numeric | lookup from eat-out × food-cost | Estimated monthly food |
+| `lifestyle_extras` | numeric | ~$0–$400 / mo | Accessories / extras |
+| `neighborhood_quality_score` | categorical→score | 1–3 | Place quality |
+| `unit_condition_score` | categorical→score | 1–3 | Apartment condition |
+| `housing_cost` | derived | rent share + utilities | Feature for model |
+| `total_monthly_burden` | derived | housing + food + extras | Feature for model |
+| `rent_to_income` | derived | housing / income | Feature for model |
+| `burden_to_income` | derived | total burden / income | Core signal for label |
+| `place_worth_score` | derived | quality + condition (2–6) | Dual-score support |
+
+### What we are looking for (prediction target)
+**Target column:** `fit_label`  
+**Classes:** `Comfortable` | `Stretch` | `Too High`
+
+Labeling rules used to create the target (documented for transparency):
+- **Comfortable:** `burden_to_income` ≤ 0.45
+- **Stretch:** 0.45 &lt; `burden_to_income` ≤ 0.60
+- **Too High:** `burden_to_income` &gt; 0.60  
+- Extra nudge: if label would be Stretch but place worth is very weak (quality + condition ≤ 2), label becomes **Too High**
+
+The live app also shows **Place Worth** and leftover metrics, but the ML classifier’s main predicted class is `fit_label`.
+
+### Missing / incomplete data: what is required to predict
+The Streamlit form is designed so prediction does **not** rely on sparse scraped data. For a prediction to run:
+
+| Field | Required? | If missing / invalid |
+|---|---|---|
+| Monthly income | **Required** | Block prediction; show error (must be &gt; 0) |
+| Listed rent | **Required** | Block prediction; show error (cannot be negative) |
+| Utilities | **Required** | Block prediction; default not assumed blank |
+| Eat out | **Required** | Must pick Rarely / Sometimes / Often |
+| Neighborhood food cost | **Required** | Must pick Low / Medium / High |
+| Extras / accessories | **Required** (can be $0) | Blank → treat as error or coerce to 0 only if user enters 0 |
+| Neighborhood quality | **Required** | Must pick Low / Medium / High |
+| Unit condition | **Required** | Must pick Needs work / Average / Excellent |
+| Roommates | **Required** | Default 1; reject values &lt; 1 |
+| Safety buffer | Optional for model | Used for warning only; default $300 |
+| Decision journal note | Optional | Not used by the model |
+
+**Missing-data policy for training and inference**
+- Training synthetic data is generated **complete** (no random NaNs by default), so the baseline model trains on full rows.
+- For realism in Deliverable 2/final, I may inject a small missingness check (about **0–5%** optional fields only) and drop/impute those rows in the notebook—but **core money + lifestyle category fields stay required**.
+- At prediction time, the app **does not impute** required fields behind the scenes. If anything required is missing/invalid, it returns a clear validation error instead of a silent guess.
+- Derived fields (`food_spend`, ratios, burden) are always computed from the required inputs, so they are not “missing” if inputs are valid.
+
+**Bottom line:** the model expects a complete lifestyle-aware feature vector; roughly **all core attributes above must be present** to predict. Optional journal text and safety buffer do not block the classifier.
+
 ## 4. Application Architecture
 
 ![Application architecture](docs/architecture.png)
