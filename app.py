@@ -1,29 +1,42 @@
-"""Streamlit UI for Rent Affordability Fit Checker with unique decision tools."""
+"""Streamlit prototype for Rent Affordability Fit Checker (Deliverable 2).
+
+Core interaction: form inputs -> RentFitPredictor -> joblib model inference
+Integrations: trained ML model + optional SQLite decision journal save
+"""
+
+from pathlib import Path
 
 import streamlit as st
 
-from rent_predictor import RentFitPredictor
+from database import list_predictions, save_prediction
+from rent_predictor import MODEL_PATH, RentFitPredictor
 
 st.set_page_config(page_title="Rent Fit Checker", page_icon="🏠", layout="centered")
 
 st.title("Rent Affordability Fit Checker")
-st.caption("CIS 3400 Project 2 · Option 1 · Lifestyle-aware rent decisions (not a basic 30% calculator)")
+st.caption("CIS 3400 Project 2 · Deliverable 2 prototype · Option 1 Predictive Web App")
 
-st.info(
-    "Deliverable 1 scaffold with unique features preview. "
-    "Trained joblib model will replace rule preview for the Nov 23 prototype."
-)
+predictor = RentFitPredictor()
+model_ready = predictor.load_model()
+
+if model_ready:
+    st.success("Integration ready: trained `rent_fit_model.joblib` loaded for inference.")
+else:
+    st.warning(
+        "Model file not found. Run `python notebooks/train_model_starter.py` then refresh. "
+        f"Expected path: `{MODEL_PATH}`"
+    )
 
 with st.expander("What makes this different from typical rent calculators?", expanded=False):
     st.markdown(
         """
-- **Lifestyle-adjusted fit** — eat-out habits, neighborhood food prices, extras (not rent-only rules)
+- **Lifestyle-adjusted fit** — eat-out, neighborhood food prices, extras
 - **Dual score** — Money Fit label **and** Place Worth score
-- **Gap-to-Comfortable advisor** — reverse suggestions for what to change
-- **Lifestyle stress test** — Rarely vs Often eat-out impact in one click
+- **Gap-to-Comfortable advisor** — reverse suggestions
+- **Lifestyle stress test** — Rarely vs Often eat-out impact
 - **Roommate share mode** — predicts on *your* share of rent
-- **Student safety buffer** — warns if leftover falls below an emergency target
-- **Decision journal** (final) — save why you liked a listing with the prediction
+- **Student safety buffer** — leftover emergency warning
+- **Decision journal** — optional note saved with SQLite history
         """
     )
 
@@ -84,8 +97,8 @@ decision_note = st.text_input(
     "Decision journal note (optional)",
     placeholder="e.g. Close to campus, noisy street, likes the kitchen...",
 )
+save_to_history = st.checkbox("Save this check to SQLite history", value=True)
 
-predictor = RentFitPredictor()
 run = st.button("Check rent fit", type="primary")
 
 if run:
@@ -123,6 +136,27 @@ if run:
             unit_condition,
             int(roommates),
         )
+        if save_to_history:
+            save_prediction(
+                {
+                    "income": income,
+                    "rent": rent,
+                    "utilities": utilities,
+                    "roommates": int(roommates),
+                    "eat_out": eat_out,
+                    "neighborhood_food_cost": neighborhood_food_cost,
+                    "lifestyle_extras": lifestyle_extras,
+                    "neighborhood_quality": neighborhood_quality,
+                    "unit_condition": unit_condition,
+                    "food_spend": result["food_spend"],
+                    "fit_label": result["fit_label"],
+                    "place_worth_score": result["place_worth_score"],
+                    "leftover": result["leftover"],
+                    "housing_share": result["housing_share"],
+                    "burden_share": result["burden_share"],
+                    "decision_note": decision_note or None,
+                }
+            )
     except ValueError as exc:
         st.error(str(exc))
     else:
@@ -147,17 +181,28 @@ if "last_result" in st.session_state:
     m3.metric("Food in this area", f"${result['food_spend']:,.0f}")
     m4.metric("Total burden", f"{result['burden_share'] * 100:.0f}%")
 
+    if result.get("probabilities"):
+        st.caption(
+            "Model class probabilities: "
+            + ", ".join(f"{k}={v:.0%}" for k, v in result["probabilities"].items())
+        )
+
     st.write(result["value_note"])
     if result["buffer_warning"]:
         st.warning(result["buffer_warning"])
     if st.session_state.get("last_note"):
         st.caption(f"Journal note: {st.session_state['last_note']}")
 
+    if result["model_backed"]:
+        st.success("Prediction from trained Random Forest model (joblib integration).")
+    else:
+        st.caption("Fallback rule preview — train/export the model to enable ML inference.")
+
     st.subheader("Gap-to-Comfortable advisor")
-    st.write(gap["message"])
     if gap["already_comfortable"]:
         st.success(gap["message"])
     else:
+        st.write(gap["message"])
         for tip in gap["suggestions"]:
             st.markdown(f"- {tip}")
 
@@ -165,10 +210,15 @@ if "last_result" in st.session_state:
     st.caption("Same apartment & income — only eat-out level changes.")
     st.dataframe(stress, use_container_width=True)
 
-    if not result["model_backed"]:
-        st.caption("Preview rules only — ML model coming in Deliverable 2.")
-
 st.divider()
-st.markdown(
-    "**Final extras:** SQLite decision journal history · side-by-side listing compare · model-backed inference"
+st.subheader("Recent SQLite history")
+history = list_predictions(limit=8)
+if history:
+    st.dataframe(history, use_container_width=True)
+else:
+    st.caption("No saved checks yet. Run a prediction with history saving enabled.")
+
+st.caption(
+    f"Model path: `{Path(MODEL_PATH).as_posix()}` · "
+    "Remaining for final: listing compare polish, more tests, screenshots, presentation."
 )

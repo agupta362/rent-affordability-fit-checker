@@ -1,18 +1,17 @@
 """Rent fit prediction with lifestyle context and unique decision helpers.
 
-Unique vs typical web rent calculators / class demos:
-- Lifestyle-adjusted burden (not only the 30% rent rule)
-- Dual output: Money Fit label + Place Worth score
-- Gap-to-Comfortable advisor (what to change to get Comfortable)
-- Lifestyle stress test (Rarely vs Often eat-out impact)
-- Roommate share mode (predict on YOUR share of rent)
-- Student safety-buffer warning
+Integrations (Deliverable 2):
+- Loads trained scikit-learn model from models/rent_fit_model.joblib
+- Optional SQLite history via database.py (used by app)
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+
+import joblib
+import pandas as pd
 
 MODEL_PATH = Path(__file__).resolve().parent / "models" / "rent_fit_model.joblib"
 FIT_LABELS = ("Comfortable", "Stretch", "Too High")
@@ -36,7 +35,25 @@ FOOD_COST_SCORE = {"Low": 1, "Medium": 2, "High": 3}
 
 COMFORTABLE_BURDEN = 0.45
 STRETCH_BURDEN = 0.60
-DEFAULT_SAFETY_BUFFER = 300.0  # student emergency leftover target
+DEFAULT_SAFETY_BUFFER = 300.0
+
+# Must match notebooks/train_model_starter.py FEATURE_COLS
+FEATURE_COLS = [
+    "income",
+    "rent_share",
+    "utilities",
+    "housing_cost",
+    "food_spend",
+    "lifestyle_extras",
+    "total_monthly_burden",
+    "rent_to_income",
+    "burden_to_income",
+    "eat_out_score",
+    "food_cost_score",
+    "neighborhood_quality_score",
+    "unit_condition_score",
+    "place_worth_score",
+]
 
 
 class RentFitPredictor:
@@ -45,9 +62,26 @@ class RentFitPredictor:
     def __init__(self, model_path: Path | str = MODEL_PATH) -> None:
         self.model_path = Path(model_path)
         self.model = None
+        self.feature_cols = list(FEATURE_COLS)
+        self._load_attempted = False
 
-    def load_model(self) -> None:
-        raise NotImplementedError("Train and export rent_fit_model.joblib first (see notebooks/).")
+    def load_model(self) -> bool:
+        """Load the trained classifier. Returns True if model is ready."""
+        self._load_attempted = True
+        if not self.model_path.exists():
+            self.model = None
+            return False
+        payload = joblib.load(self.model_path)
+        self.model = payload["model"]
+        self.feature_cols = list(payload.get("features", FEATURE_COLS))
+        return True
+
+    def ensure_model(self) -> bool:
+        if self.model is not None:
+            return True
+        if not self._load_attempted:
+            return self.load_model()
+        return False
 
     def validate(
         self,
@@ -85,7 +119,6 @@ class RentFitPredictor:
         return float(rent) / max(int(roommates), 1)
 
     def place_worth_score(self, neighborhood_quality: str, unit_condition: str) -> int:
-        """1-6 score combining area + unit (unique dual output vs money-only calculators)."""
         return QUALITY_SCORE[neighborhood_quality] + CONDITION_SCORE[unit_condition]
 
     def features(
@@ -126,7 +159,22 @@ class RentFitPredictor:
             "place_worth_score": float(worth),
         }
 
-    def _label_from_features(self, feats: dict[str, float]) -> tuple[str, str]:
+    def model_feature_row(self, feats: dict[str, float]) -> pd.DataFrame:
+        return pd.DataFrame([[feats[c] for c in self.feature_cols]], columns=self.feature_cols)
+
+    def _value_note(self, label: str, feats: dict[str, float]) -> str:
+        quality = feats["neighborhood_quality_score"] + feats["unit_condition_score"]
+        if label == "Stretch" and quality <= 2:
+            return "Budget is tight and neighborhood/unit quality is low."
+        if label == "Comfortable" and quality >= 5:
+            return "Strong value: budget fits and neighborhood/unit look solid."
+        if label == "Too High" and quality >= 5:
+            return "Nice place, but the total monthly lifestyle cost looks too high."
+        if label == "Stretch":
+            return "Doable, but eating out / extras leave less buffer."
+        return "Fair value for the area/condition."
+
+    def _rule_label(self, feats: dict[str, float]) -> str:
         burden = feats["burden_to_income"]
         if burden <= COMFORTABLE_BURDEN:
             label = "Comfortable"
@@ -134,19 +182,10 @@ class RentFitPredictor:
             label = "Stretch"
         else:
             label = "Too High"
-
         quality = feats["neighborhood_quality_score"] + feats["unit_condition_score"]
-        value_note = "Fair value for the area/condition."
         if label == "Stretch" and quality <= 2:
             label = "Too High"
-            value_note = "Budget is tight and neighborhood/unit quality is low."
-        elif label == "Comfortable" and quality >= 5:
-            value_note = "Strong value: budget fits and neighborhood/unit look solid."
-        elif label == "Too High" and quality >= 5:
-            value_note = "Nice place, but the total monthly lifestyle cost looks too high."
-        elif label == "Stretch":
-            value_note = "Doable, but eating out / extras leave less buffer."
-        return label, value_note
+        return label
 
     def predict(
         self,
@@ -183,7 +222,20 @@ class RentFitPredictor:
             unit_condition,
             roommates,
         )
-        label, value_note = self._label_from_features(feats)
+
+        model_backed = self.ensure_model()
+        proba = None
+        if model_backed and self.model is not None:
+            row = self.model_feature_row(feats)
+            label = str(self.model.predict(row)[0])
+            if hasattr(self.model, "predict_proba"):
+                probs = self.model.predict_proba(row)[0]
+                classes = list(self.model.classes_)
+                proba = {str(c): float(p) for c, p in zip(classes, probs)}
+        else:
+            label = self._rule_label(feats)
+
+        value_note = self._value_note(label, feats)
         buffer_ok = feats["leftover"] >= safety_buffer
         buffer_warning = None
         if not buffer_ok:
@@ -194,6 +246,7 @@ class RentFitPredictor:
 
         return {
             "fit_label": label,
+            "probabilities": proba,
             "place_worth_score": int(feats["place_worth_score"]),
             "place_worth_label": self._worth_label(int(feats["place_worth_score"])),
             "leftover": round(feats["leftover"], 2),
@@ -205,7 +258,7 @@ class RentFitPredictor:
             "buffer_ok": buffer_ok,
             "buffer_warning": buffer_warning,
             "features": feats,
-            "model_backed": False,
+            "model_backed": model_backed,
         }
 
     def _worth_label(self, score: int) -> str:
@@ -227,10 +280,6 @@ class RentFitPredictor:
         unit_condition: str,
         roommates: int = 1,
     ) -> dict[str, Any]:
-        """Unique reverse advisor: what changes could reach Comfortable?
-
-        Most web calculators only score the current numbers forward.
-        """
         current = self.predict(
             income,
             rent,
@@ -250,11 +299,9 @@ class RentFitPredictor:
             }
 
         food = self.estimate_food_spend(eat_out, neighborhood_food_cost)
-        # Max housing+food+extras at comfortable band
         max_burden = income * COMFORTABLE_BURDEN
         max_rent_share = max(0.0, max_burden - utilities - food - lifestyle_extras)
         max_listed_rent = max_rent_share * roommates
-
         rarely_food = self.estimate_food_spend("Rarely", neighborhood_food_cost)
         cut_food = max(0.0, food - rarely_food)
         cut_extras_needed = max(
@@ -299,7 +346,6 @@ class RentFitPredictor:
         unit_condition: str,
         roommates: int = 1,
     ) -> list[dict[str, Any]]:
-        """Compare Rarely / Sometimes / Often eat-out without retyping the whole form."""
         rows = []
         for level in ("Rarely", "Sometimes", "Often"):
             result = self.predict(

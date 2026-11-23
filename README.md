@@ -6,7 +6,64 @@
 **Course:** CIS 3400 – Advanced Programming  
 **Final Presentation:** December 8, 2026
 
-**Deliverable 1 status:** Resubmission for full credit — README updated with clearer architecture, interface sketch, prototype vs final scope, module roles, and AI-assisted development workflow.
+**Deliverable 2 (Nov 23):** Working prototype ready — GitHub link below, core Streamlit interaction live, ML model + SQLite integrations connected.
+
+---
+
+## Deliverable 2 — Status Report (Nov 23, 2026)
+
+### Submit / demonstrate checklist
+1. **Working prototype** — yes (`streamlit run app.py`)
+2. **GitHub repository + README** — https://github.com/agupta362/rent-affordability-fit-checker
+3. **Core interaction + initial integration** — form → `RentFitPredictor` → trained `joblib` model; optional SQLite history save
+4. **Status summary** — this section
+
+### Completed and working now
+- Streamlit UI with money / lifestyle / neighborhood inputs
+- Separate `RentFitPredictor` class (validation, features, predict, advisor, stress test)
+- **Integration 1:** trained Random Forest model loaded from `models/rent_fit_model.joblib`
+- **Integration 2:** SQLite prediction / decision-journal history via `database.py`
+- Dual score display (Money Fit + Place Worth), Gap-to-Comfortable advisor, eat-out stress test
+- Roommate share mode + safety-buffer warning
+- Synthetic training pipeline in `notebooks/train_model_starter.py` (1000 rows; metrics in `docs/prototype_metrics.txt`)
+
+### How to run the prototype
+```bash
+git clone https://github.com/agupta362/rent-affordability-fit-checker.git
+cd rent-affordability-fit-checker
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+# Model is already in models/; retrain only if needed:
+# python notebooks/train_model_starter.py
+streamlit run app.py
+```
+
+### Demo path (core interaction)
+1. Enter income / listed rent / utilities / roommates  
+2. Set eat-out, neighborhood food cost, extras, quality, condition  
+3. Click **Check rent fit**  
+4. See Money Fit from the **trained model**, Place Worth, leftover, advisor tips, stress-test table  
+5. Confirm a row appears in **Recent SQLite history**
+
+### Work remaining for final (Dec 8)
+- Side-by-side listing compare UI polish
+- More formal edge-case test evidence + screenshots in README
+- Stronger presentation prep / optional chart of history
+- Final AI-use disclosure wording pass
+
+### Architecture note
+Pipeline unchanged from Deliverable 1 planning:  
+`User inputs → app.py (Streamlit) → RentFitPredictor → rent_fit_model.joblib → dual scores / advisor / stress test → SQLite history`  
+![Application architecture](docs/architecture.png)
+
+### AI-generated component tested/modified (Deliverable 2 requirement)
+AI helped draft the early `RentFitPredictor` / Streamlit scaffold. For this prototype I **tested and modified** it to:
+- load `joblib` model payloads (`{"model", "features"}`)
+- align feature column order with the training script
+- return class probabilities
+- connect SQLite save/history in `app.py`  
+I can explain these changes and the prediction pipeline.
 
 ---
 
@@ -227,21 +284,23 @@ streamlit run app.py
 ```
 
 **Notes**
-- Current scaffold includes a rule-based preview so the UI and unique tools run before the joblib model is fully wired for Deliverable 2.
+- Deliverable 2 prototype loads `models/rent_fit_model.joblib` automatically (included in the repo).
+- If the model is missing locally, run `python notebooks/train_model_starter.py`.
 - No API keys or secrets are required. Do not commit `.env` files or credentials.
 
 ## 7. Testing and Validation
 
 | Test | Expected Result | Actual Result |
 |---|---|---|
-| Normal inputs (income/rent/utilities + lifestyle defaults) | Dual scores + leftover + food estimate | Pending — Deliverable 2 |
-| Invalid or missing input (blank / negative values) | Helpful error message | Pending — Deliverable 2 |
-| High eat-out + expensive neighborhood food | Higher burden; may move Comfortable → Stretch/Too High | Pending — Deliverable 2 |
-| Lifestyle stress test | Rarely / Sometimes / Often rows with different leftovers | Pending — Deliverable 2 |
-| Model interaction after training | Label from saved joblib model | Pending — Deliverable 2 |
-| History / journal feature | Saved note + prediction display | Pending — final |
+| Normal inputs (income 4500, rent 1800, utilities 150, defaults) | Dual scores + leftover + food estimate | **Pass** — prototype returns model-backed label + metrics |
+| Invalid income (<= 0) | Helpful error message | **Pass** — `ValueError` / Streamlit error |
+| High eat-out + expensive neighborhood food | Higher food spend / burden | **Pass** — food lookup + burden share update |
+| Lifestyle stress test | Rarely / Sometimes / Often rows | **Pass** — 3-row table shown |
+| Model interaction after training | Label from saved joblib model | **Pass** — `model_backed=True`; see `docs/prototype_metrics.txt` |
+| SQLite history save | Saved check appears in history table | **Pass** — prototype saves when checkbox enabled |
+| Listing compare UI | Side-by-side compare | Remaining — final |
 
-**Known limitations (Deliverable 1):** Food spend is estimated from eat-out × neighborhood food-cost bands. Labels use documented synthetic rules. Educational guidance only—not professional financial advice.
+**Known limitations:** Food spend uses documented eat-out × neighborhood bands. Synthetic labels follow explicit burden rules (so offline accuracy can look very high). Educational guidance only—not professional financial advice.
 
 ## 8. AI-Assisted Development Disclosure / Workflow
 
@@ -259,10 +318,10 @@ Deliverable 1 requires showing **where AI-assisted development fits into the pla
 | Testing & README | Test cases and presentation explanation | Improve README wording; suggest edge tests |
 
 ### How AI Was Used so far
-For Deliverable 1, AI helped draft README structure, repository scaffold wording, and architecture/interface documentation. I selected the unique features, Option 1 design, and module boundaries.
+For Deliverable 1, AI helped draft README structure, repository scaffold wording, and architecture/interface documentation. For Deliverable 2, AI-assisted code for the predictor/UI scaffold was **tested and modified** so the app loads the trained joblib model with matching feature order, exposes probabilities, and saves SQLite history.
 
 ### Student Contributions
-I defined the personal rent-fit problem, chose Option 1, designed the lifestyle-adjusted / dual-score / stress-test approach, planned the architecture (`app.py` → `RentFitPredictor` → joblib → SQLite), and will own labeling rules, integration, testing, and explanation of the final code.
+I defined the personal rent-fit problem, chose Option 1, designed the lifestyle-adjusted / dual-score / stress-test approach, planned the architecture (`app.py` → `RentFitPredictor` → joblib → SQLite), aligned training features with inference, trained/exported the prototype model, and verified core interaction + integrations.
 
 **Student statement:** I reviewed, tested, and can explain the code and technologies used in my application, including code developed with AI assistance. Significant AI help will remain disclosed in this README through the final submission.
 
@@ -301,8 +360,8 @@ Screenshots will be added for Deliverable 2 / final. For Deliverable 1, the prel
 
 ## 12. Future Improvements
 
-1. Wire the Streamlit app fully to the trained joblib model (replace preview rules) for Deliverable 2.
-2. Add listing compare + SQLite decision-journal history for the final submission.
+1. Add polished side-by-side listing compare for the final submission.
+2. Add README screenshots and broader edge-case test evidence.
 3. Optional presets (e.g., “student who eats out often”) to speed data entry.
 
 ---
@@ -321,6 +380,6 @@ Screenshots will be added for Deliverable 2 / final. For Deliverable 1, the prel
 
 ### Documentation Timeline
 
-- **Deliverable 1 – November 16:** Complete the project overview, planned features, proposed technologies, preliminary architecture diagram, planned project structure, and AI workflow. These are planning sections and may change as development progresses.
-- **Deliverable 2 – November 23:** Update the README to reflect implementation progress and initial testing.
+- **Deliverable 1 – November 16:** Complete the project overview, planned features, proposed technologies, preliminary architecture diagram, planned project structure, and AI workflow.
+- **Deliverable 2 – November 23:** README updated with working-prototype status, integrations (joblib + SQLite), run instructions, initial testing results, and remaining work.
 - **Final Deliverable – December 8:** Complete all sections, verify setup instructions, add screenshots, and provide final links.

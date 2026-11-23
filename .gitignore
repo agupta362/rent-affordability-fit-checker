@@ -10,11 +10,14 @@ venv/
 # Jupyter
 .ipynb_checkpoints/
 
-# Model / data artifacts (keep placeholders; ignore large local dumps)
+# Model / data artifacts
+# Keep the trained prototype model in git so instructors can run without retraining.
 *.joblib
+!models/rent_fit_model.joblib
 !models/.gitkeep
 data/*.csv
 !data/.gitkeep
+data/*.db
 
 # OS / IDE
 .DS_Store
