@@ -211,6 +211,72 @@ if "last_result" in st.session_state:
     st.dataframe(stress, use_container_width=True)
 
 st.divider()
+st.subheader("Compare two listings")
+st.caption("Same income/lifestyle — only rent, utilities, and place ratings change.")
+cmp_on = st.checkbox("Enable listing compare", value=False)
+if cmp_on:
+    left, right = st.columns(2)
+    with left:
+        st.markdown("**Listing A** (current form rent/place)")
+        st.write(f"Rent ${rent:,.0f} · Utils ${utilities:,.0f}")
+        st.write(f"{neighborhood_quality} area · {unit_condition}")
+    with right:
+        st.markdown("**Listing B**")
+        rent_b = st.number_input("Listing B rent ($)", min_value=0.0, value=max(rent - 200, 0.0), step=50.0)
+        util_b = st.number_input("Listing B utilities ($)", min_value=0.0, value=utilities, step=10.0)
+        qual_b = st.selectbox("Listing B neighborhood", ["Low", "Medium", "High"], index=1, key="qual_b")
+        cond_b = st.selectbox(
+            "Listing B condition",
+            ["Needs work", "Average", "Excellent"],
+            index=1,
+            key="cond_b",
+        )
+    if st.button("Compare listings"):
+        try:
+            res_a = predictor.predict(
+                income,
+                rent,
+                utilities,
+                eat_out,
+                neighborhood_food_cost,
+                lifestyle_extras,
+                neighborhood_quality,
+                unit_condition,
+                int(roommates),
+                safety_buffer,
+            )
+            res_b = predictor.predict(
+                income,
+                rent_b,
+                util_b,
+                eat_out,
+                neighborhood_food_cost,
+                lifestyle_extras,
+                qual_b,
+                cond_b,
+                int(roommates),
+                safety_buffer,
+            )
+        except ValueError as exc:
+            st.error(str(exc))
+        else:
+            ca, cb = st.columns(2)
+            with ca:
+                st.metric("A Money Fit", res_a["fit_label"])
+                st.write(f"Leftover ${res_a['leftover']:,.0f}")
+                st.write(f"Place Worth {res_a['place_worth_score']}/6")
+            with cb:
+                st.metric("B Money Fit", res_b["fit_label"])
+                st.write(f"Leftover ${res_b['leftover']:,.0f}")
+                st.write(f"Place Worth {res_b['place_worth_score']}/6")
+            if res_b["leftover"] > res_a["leftover"]:
+                st.info("Listing B leaves more monthly leftover under the same lifestyle.")
+            elif res_a["leftover"] > res_b["leftover"]:
+                st.info("Listing A leaves more monthly leftover under the same lifestyle.")
+            else:
+                st.info("Both listings leave about the same leftover under the same lifestyle.")
+
+st.divider()
 st.subheader("Recent SQLite history")
 history = list_predictions(limit=8)
 if history:
@@ -218,7 +284,4 @@ if history:
 else:
     st.caption("No saved checks yet. Run a prediction with history saving enabled.")
 
-st.caption(
-    f"Model path: `{Path(MODEL_PATH).as_posix()}` · "
-    "Remaining for final: listing compare polish, more tests, screenshots, presentation."
-)
+st.caption(f"Model path: `{Path(MODEL_PATH).as_posix()}`")

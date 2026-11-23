@@ -19,23 +19,25 @@
 4. **Status summary** — this section
 
 ### Completed and working now
-- Streamlit UI with money / lifestyle / neighborhood inputs
-- Separate `RentFitPredictor` class (validation, features, predict, advisor, stress test)
-- **Integration 1:** trained Random Forest model loaded from `models/rent_fit_model.joblib`
-- **Integration 2:** SQLite prediction / decision-journal history via `database.py`
-- Dual score display (Money Fit + Place Worth), Gap-to-Comfortable advisor, eat-out stress test
+- Core user interaction (inputs → predict → dual scores / advisor / stress test)
+- **Integration 1:** trained Random Forest model (`models/rent_fit_model.joblib`)
+- **Integration 2:** SQLite save/list prediction history (decision journal note optional)
+- Listing compare for two apartments under the same lifestyle
 - Roommate share mode + safety-buffer warning
-- Synthetic training pipeline in `notebooks/train_model_starter.py` (1000 rows; metrics in `docs/prototype_metrics.txt`)
+- Training script + prototype metrics (`docs/prototype_metrics.txt`)
 
-### How to run the prototype
+### How to run locally
 ```bash
-git clone https://github.com/agupta362/rent-affordability-fit-checker.git
 cd rent-affordability-fit-checker
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+Optional venv:
+```bash
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
-# Model is already in models/; retrain only if needed:
-# python notebooks/train_model_starter.py
 streamlit run app.py
 ```
 
@@ -44,13 +46,13 @@ streamlit run app.py
 2. Set eat-out, neighborhood food cost, extras, quality, condition  
 3. Click **Check rent fit**  
 4. See Money Fit from the **trained model**, Place Worth, leftover, advisor tips, stress-test table  
-5. Confirm a row appears in **Recent SQLite history**
+5. Confirm a row appears in **Recent SQLite history**  
+6. (Optional) Enable **Compare two listings**
 
-### Work remaining for final (Dec 8)
-- Side-by-side listing compare UI polish
-- More formal edge-case test evidence + screenshots in README
-- Stronger presentation prep / optional chart of history
-- Final AI-use disclosure wording pass
+### Remaining for Dec 8 final
+- Stronger history tools (filter/search saved checks; optional trend chart)
+- Extra validation for unusual roommate / budget edge cases
+- Small UX polish on compare + journal workflow
 
 ### Architecture note
 Pipeline unchanged from Deliverable 1 planning:  
@@ -342,15 +344,13 @@ New skills to develop: packaging a trained model with Streamlit, class-based fea
 
 ## 10. Application Screenshots
 
-Screenshots will be added for Deliverable 2 / final. For Deliverable 1, the preliminary sketch is above (`docs/interface_sketch.png`).
+Preliminary sketch (Deliverable 1):
 
-1. Main application interface (grouped inputs)
-2. Application showing a working prediction result
+![Preliminary interface sketch](docs/interface_sketch.png)
 
-```markdown
-![Main application interface](docs/main-screen.png)
-![Prediction result](docs/result-screen.png)
-```
+Working prototype UI (Deliverable 2):
+
+![Prototype main screen](docs/prototype_main_screen.png)
 
 ## 11. Project Links
 
@@ -360,9 +360,9 @@ Screenshots will be added for Deliverable 2 / final. For Deliverable 1, the prel
 
 ## 12. Future Improvements
 
-1. Add polished side-by-side listing compare for the final submission.
-2. Add README screenshots and broader edge-case test evidence.
-3. Optional presets (e.g., “student who eats out often”) to speed data entry.
+1. Add history filters / trend chart over saved SQLite checks.
+2. Expand edge-case validation for unusual roommate and budget mixes.
+3. Optional lifestyle presets (e.g., “student who eats out often”) to speed entry.
 
 ---
 
