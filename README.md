@@ -10,6 +10,21 @@
 
 **GitHub:** https://github.com/agupta362/rent-affordability-fit-checker
 
+### Deploy on Streamlit Community Cloud (public web link)
+1. Open [https://share.streamlit.io](https://share.streamlit.io) and sign in with **GitHub** (`agupta362`)
+2. Click **Create app** → **Yup, I have an app**
+3. Set:
+   - **Repository:** `agupta362/rent-affordability-fit-checker`
+   - **Branch:** `master`
+   - **Main file path:** `app.py`
+4. Optional: pick a custom subdomain (e.g. `rent-fit-checker`)
+5. Click **Deploy**
+
+After deploy, your public link will look like:
+`https://<your-subdomain>.streamlit.app`
+
+Paste that URL into Section 11 below once Cloud finishes building.
+
 ---
 
 ## Deliverable 3 — Submission Checklist
@@ -213,7 +228,8 @@ Skills practiced: class-based ML packaging with Streamlit, SQLite persistence, u
 ## 11. Project Links
 
 **GitHub Repository:** https://github.com/agupta362/rent-affordability-fit-checker  
-**Deployed Application:** Local Streamlit (`streamlit run app.py`)  
+**Deployed Application:** Streamlit Community Cloud — deploy from GitHub (see top of README); update this line with your `*.streamlit.app` URL after deploy  
+**Local run:** `streamlit run app.py`  
 **Presentation:** [`docs/CIS3400_Deliverable3_Presentation_Gupta.pptx`](docs/CIS3400_Deliverable3_Presentation_Gupta.pptx)  
 **Presentation script:** [`docs/PRESENTATION_SCRIPT.md`](docs/PRESENTATION_SCRIPT.md)
 
