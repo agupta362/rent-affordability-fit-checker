@@ -1,30 +1,59 @@
-"""Streamlit prototype for Rent Affordability Fit Checker (Deliverable 2).
+"""Final Streamlit app: Rent Affordability Fit Checker (Deliverable 3).
 
-Core interaction: form inputs -> RentFitPredictor -> joblib model inference
-Integrations: trained ML model + optional SQLite decision journal save
+Core flow: form inputs -> RentFitPredictor -> joblib model inference
+Integrations: trained ML model + SQLite decision journal / history
 """
 
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 
-from database import list_predictions, save_prediction
+from database import history_summary, list_predictions, save_prediction
 from rent_predictor import MODEL_PATH, RentFitPredictor
 
 st.set_page_config(page_title="Rent Fit Checker", page_icon="🏠", layout="centered")
 
+PRESETS = {
+    "Custom": None,
+    "Student (budget, rarely eats out)": {
+        "income": 2800.0,
+        "rent": 1400.0,
+        "utilities": 120.0,
+        "roommates": 2,
+        "eat_out": "Rarely",
+        "neighborhood_food_cost": "Medium",
+        "lifestyle_extras": 50.0,
+        "neighborhood_quality": "Medium",
+        "unit_condition": "Average",
+        "safety_buffer": 250.0,
+    },
+    "Intern (eats out often, expensive area)": {
+        "income": 4500.0,
+        "rent": 2200.0,
+        "utilities": 160.0,
+        "roommates": 1,
+        "eat_out": "Often",
+        "neighborhood_food_cost": "High",
+        "lifestyle_extras": 200.0,
+        "neighborhood_quality": "High",
+        "unit_condition": "Excellent",
+        "safety_buffer": 300.0,
+    },
+}
+
 st.title("Rent Affordability Fit Checker")
-st.caption("CIS 3400 Project 2 · Deliverable 2 prototype · Option 1 Predictive Web App")
+st.caption("CIS 3400 Project 2 · Final app · Option 1 Predictive Web Application")
 
 predictor = RentFitPredictor()
 model_ready = predictor.load_model()
 
 if model_ready:
-    st.success("Integration ready: trained `rent_fit_model.joblib` loaded for inference.")
+    st.success("Trained model loaded: `rent_fit_model.joblib` ready for inference.")
 else:
     st.warning(
         "Model file not found. Run `python notebooks/train_model_starter.py` then refresh. "
-        f"Expected path: `{MODEL_PATH}`"
+        f"Expected: `{MODEL_PATH}`"
     )
 
 with st.expander("What makes this different from typical rent calculators?", expanded=False):
@@ -36,60 +65,110 @@ with st.expander("What makes this different from typical rent calculators?", exp
 - **Lifestyle stress test** — Rarely vs Often eat-out impact
 - **Roommate share mode** — predicts on *your* share of rent
 - **Student safety buffer** — leftover emergency warning
-- **Decision journal** — optional note saved with SQLite history
+- **Decision journal + history filters** — SQLite saved checks with search/chart
+- **Listing compare** — two apartments, same lifestyle
         """
     )
+
+preset_name = st.selectbox("Quick lifestyle preset", list(PRESETS.keys()))
+preset = PRESETS[preset_name]
+if preset and st.session_state.get("_applied_preset") != preset_name:
+    for key, value in preset.items():
+        st.session_state[key] = value
+    st.session_state["_applied_preset"] = preset_name
 
 st.subheader("Money basics")
 c1, c2, c3, c4 = st.columns(4)
 with c1:
-    income = st.number_input("Monthly income ($)", min_value=0.0, value=4500.0, step=100.0)
+    income = st.number_input(
+        "Monthly income ($)",
+        min_value=0.0,
+        value=float(st.session_state.get("income", 4500.0)),
+        step=100.0,
+        key="income",
+    )
 with c2:
-    rent = st.number_input("Listed rent ($)", min_value=0.0, value=1800.0, step=50.0)
+    rent = st.number_input(
+        "Listed rent ($)",
+        min_value=0.0,
+        value=float(st.session_state.get("rent", 1800.0)),
+        step=50.0,
+        key="rent",
+    )
 with c3:
-    utilities = st.number_input("Utilities ($)", min_value=0.0, value=150.0, step=10.0)
+    utilities = st.number_input(
+        "Utilities ($)",
+        min_value=0.0,
+        value=float(st.session_state.get("utilities", 150.0)),
+        step=10.0,
+        key="utilities",
+    )
 with c4:
-    roommates = st.number_input("People splitting rent", min_value=1, value=1, step=1)
+    roommates = st.number_input(
+        "People splitting rent",
+        min_value=1,
+        value=int(st.session_state.get("roommates", 1)),
+        step=1,
+        key="roommates",
+    )
 
 st.subheader("Lifestyle & food")
 l1, l2, l3 = st.columns(3)
+eat_options = ["Rarely", "Sometimes", "Often"]
+food_options = ["Low", "Medium", "High"]
 with l1:
-    eat_out = st.selectbox("Do you eat out?", ["Rarely", "Sometimes", "Often"], index=1)
+    eat_default = st.session_state.get("eat_out", "Sometimes")
+    eat_out = st.selectbox(
+        "Do you eat out?",
+        eat_options,
+        index=eat_options.index(eat_default) if eat_default in eat_options else 1,
+        key="eat_out",
+    )
 with l2:
+    food_default = st.session_state.get("neighborhood_food_cost", "Medium")
     neighborhood_food_cost = st.selectbox(
         "Neighborhood food cost",
-        ["Low", "Medium", "High"],
-        index=1,
+        food_options,
+        index=food_options.index(food_default) if food_default in food_options else 1,
+        key="neighborhood_food_cost",
         help="How expensive restaurants/groceries feel in that area",
     )
 with l3:
     lifestyle_extras = st.number_input(
         "Extras / accessories ($/mo)",
         min_value=0.0,
-        value=100.0,
+        value=float(st.session_state.get("lifestyle_extras", 100.0)),
         step=25.0,
+        key="lifestyle_extras",
     )
 
 st.subheader("Neighborhood & unit")
 n1, n2, n3 = st.columns(3)
+qual_options = ["Low", "Medium", "High"]
+cond_options = ["Needs work", "Average", "Excellent"]
 with n1:
+    qual_default = st.session_state.get("neighborhood_quality", "Medium")
     neighborhood_quality = st.selectbox(
         "Neighborhood quality",
-        ["Low", "Medium", "High"],
-        index=1,
+        qual_options,
+        index=qual_options.index(qual_default) if qual_default in qual_options else 1,
+        key="neighborhood_quality",
     )
 with n2:
+    cond_default = st.session_state.get("unit_condition", "Average")
     unit_condition = st.selectbox(
         "Apartment / rent condition",
-        ["Needs work", "Average", "Excellent"],
-        index=1,
+        cond_options,
+        index=cond_options.index(cond_default) if cond_default in cond_options else 1,
+        key="unit_condition",
     )
 with n3:
     safety_buffer = st.number_input(
         "Safety buffer ($/mo)",
         min_value=0.0,
-        value=300.0,
+        value=float(st.session_state.get("safety_buffer", 300.0)),
         step=50.0,
+        key="safety_buffer",
         help="Student emergency leftover target",
     )
 
@@ -99,10 +178,23 @@ decision_note = st.text_input(
 )
 save_to_history = st.checkbox("Save this check to SQLite history", value=True)
 
+# Soft warnings for unusual but allowed edge cases
+if income > 0 and rent / max(int(roommates), 1) > income:
+    st.warning("Your rent share is higher than your monthly income — expect a Too High result.")
+if int(roommates) >= 5:
+    st.info("Large roommate count: make sure everyone is truly splitting the listed rent.")
+
 run = st.button("Check rent fit", type="primary")
 
 if run:
     try:
+        if income <= 0:
+            raise ValueError("Monthly income must be positive.")
+        if rent < 0 or utilities < 0 or lifestyle_extras < 0:
+            raise ValueError("Rent, utilities, and extras cannot be negative.")
+        if int(roommates) < 1:
+            raise ValueError("People splitting rent must be at least 1.")
+
         result = predictor.predict(
             income=income,
             rent=rent,
@@ -277,11 +369,26 @@ if cmp_on:
                 st.info("Both listings leave about the same leftover under the same lifestyle.")
 
 st.divider()
-st.subheader("Recent SQLite history")
-history = list_predictions(limit=8)
-if history:
-    st.dataframe(history, use_container_width=True)
-else:
-    st.caption("No saved checks yet. Run a prediction with history saving enabled.")
+st.subheader("SQLite history, filters, and trend")
+hf1, hf2, hf3 = st.columns(3)
+with hf1:
+    label_filter = st.selectbox("Filter by Money Fit", ["All", "Comfortable", "Stretch", "Too High"])
+with hf2:
+    note_search = st.text_input("Search journal notes", placeholder="campus, kitchen...")
+with hf3:
+    hist_limit = st.slider("Rows to show", min_value=5, max_value=50, value=15)
 
-st.caption(f"Model path: `{Path(MODEL_PATH).as_posix()}`")
+history = list_predictions(limit=hist_limit, fit_label=label_filter, search_note=note_search or None)
+summary = history_summary()
+st.caption(f"Saved checks in database: **{summary['total']}** · counts by label: {summary['by_label'] or '{}'}")
+
+if history:
+    hist_df = pd.DataFrame(history)
+    st.dataframe(hist_df, use_container_width=True)
+    trend = hist_df.sort_values("id")[["id", "leftover", "burden_share", "fit_label"]]
+    st.line_chart(trend.set_index("id")[["leftover"]])
+    st.caption("Trend chart: leftover ($) for recent saved checks (filtered view).")
+else:
+    st.caption("No saved checks match these filters yet.")
+
+st.caption(f"Model path: `{Path(MODEL_PATH).as_posix()}` · Final Deliverable 3")

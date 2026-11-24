@@ -1,4 +1,4 @@
-"""SQLite helpers for decision journal / prediction history (final app target)."""
+"""SQLite helpers for decision journal / prediction history."""
 
 from __future__ import annotations
 
@@ -18,7 +18,8 @@ def get_connection(db_path: Path | str = DB_PATH) -> sqlite3.Connection:
 
 
 def init_db(db_path: Path | str = DB_PATH) -> None:
-    with get_connection(db_path) as conn:
+    conn = get_connection(db_path)
+    try:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS prediction_history (
@@ -44,11 +45,14 @@ def init_db(db_path: Path | str = DB_PATH) -> None:
             """
         )
         conn.commit()
+    finally:
+        conn.close()
 
 
 def save_prediction(payload: dict[str, Any], db_path: Path | str = DB_PATH) -> None:
     init_db(db_path)
-    with get_connection(db_path) as conn:
+    conn = get_connection(db_path)
+    try:
         conn.execute(
             """
             INSERT INTO prediction_history (
@@ -78,17 +82,68 @@ def save_prediction(payload: dict[str, Any], db_path: Path | str = DB_PATH) -> N
             ),
         )
         conn.commit()
+    finally:
+        conn.close()
 
 
-def list_predictions(limit: int = 20, db_path: Path | str = DB_PATH) -> list[dict[str, Any]]:
+def list_predictions(
+    limit: int = 50,
+    fit_label: str | None = None,
+    search_note: str | None = None,
+    db_path: Path | str = DB_PATH,
+) -> list[dict[str, Any]]:
     init_db(db_path)
-    with get_connection(db_path) as conn:
+    clauses: list[str] = []
+    params: list[Any] = []
+    if fit_label and fit_label != "All":
+        clauses.append("fit_label = ?")
+        params.append(fit_label)
+    if search_note:
+        clauses.append("COALESCE(decision_note, '') LIKE ?")
+        params.append(f"%{search_note}%")
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    params.append(limit)
+    conn = get_connection(db_path)
+    try:
         rows = conn.execute(
-            """
+            f"""
             SELECT * FROM prediction_history
+            {where}
             ORDER BY id DESC
             LIMIT ?
             """,
-            (limit,),
+            params,
         ).fetchall()
-    return [dict(row) for row in rows]
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def history_summary(db_path: Path | str = DB_PATH) -> dict[str, Any]:
+    init_db(db_path)
+    conn = get_connection(db_path)
+    try:
+        total = conn.execute("SELECT COUNT(*) AS n FROM prediction_history").fetchone()["n"]
+        by_label = conn.execute(
+            """
+            SELECT fit_label, COUNT(*) AS n
+            FROM prediction_history
+            GROUP BY fit_label
+            ORDER BY fit_label
+            """
+        ).fetchall()
+        recent = conn.execute(
+            """
+            SELECT id, leftover, burden_share, fit_label, created_at
+            FROM prediction_history
+            ORDER BY id DESC
+            LIMIT 20
+            """
+        ).fetchall()
+        return {
+            "total": total,
+            "by_label": {row["fit_label"]: row["n"] for row in by_label},
+            "recent": [dict(row) for row in recent],
+        }
+    finally:
+        conn.close()
